@@ -5,7 +5,7 @@
  * @source https://github.com/peterlee1022/discord-scratchboard
  * @website https://github.com/peterlee1022/discord-scratchboard
  * @description Adds a pencil button to the chat bar that opens a little sketchpad. Draw something and send it to the current channel as an image.
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const W = 960, H = 600;
@@ -67,7 +67,7 @@ const CSS = `
 .sb-cursor { position:absolute; pointer-events:none; border-radius:50%; border:1px solid rgba(0,0,0,.7);
   box-shadow: 0 0 0 1px rgba(255,255,255,.7); transform: translate(-50%,-50%); display:none; }
 .sb-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.sb-hint { font-size:12px; color: var(--text-muted, #949ba4); }
+.sb-hint { flex:1; font-size:12px; color: var(--text-muted, #949ba4); }
 .sb-btn { padding:8px 16px; border-radius:6px; border:none; cursor:pointer; font-size:14px; font-weight:600; }
 .sb-btn-secondary { background: var(--button-secondary-background, #4e5058); color:#fff; }
 .sb-btn-secondary:hover { filter: brightness(1.1); }
@@ -87,15 +87,24 @@ module.exports = class Scratchboard {
             BdApi.Data.load("Scratchboard", "prefs") || {}
         );
         this.onKey = this.onKey.bind(this);
+        this.onPaste = this.onPaste.bind(this);
+        this.onDrag = this.onDrag.bind(this);
     }
 
     start() {
         BdApi.DOM.addStyle("Scratchboard", CSS);
-        // The drawing survives closing the modal so an accidental Esc doesn't lose it.
+        // The drawing survives closing the modal so an accidental Esc doesn't lose it,
+        // and gets saved on close so it's still there after restarting Discord.
         this.canvas = document.createElement("canvas");
         this.canvas.width = W;
         this.canvas.height = H;
         this.ctx = this.canvas.getContext("2d", { willReadFrequently: true });
+        const saved = BdApi.Data.load("Scratchboard", "drawing");
+        if (saved) {
+            const img = new Image();
+            img.onload = () => this.ctx.drawImage(img, 0, 0);
+            img.src = saved;
+        }
         this.inject();
     }
 
@@ -170,13 +179,13 @@ module.exports = class Scratchboard {
                 <button class="sb-tool" data-act="redo" title="Redo (Ctrl+Y)">${ICON_REDO}</button>
                 <button class="sb-tool" data-act="clear" title="Clear">${ICON_TRASH}</button>
               </div>
-              <div class="sb-group">
-                ${Object.keys(BACKGROUNDS).map(b => `<div class="sb-bgbtn" data-bg="${b}">${b}</div>`).join("")}
-              </div>
             </div>
             <div class="sb-stage"><div class="sb-cursor"></div></div>
             <div class="sb-foot">
-              <div class="sb-hint">Ctrl+Enter to send · Ctrl+C to copy · Esc to close</div>
+              <div class="sb-group" title="Background">
+                ${Object.keys(BACKGROUNDS).map(b => `<div class="sb-bgbtn" data-bg="${b}">${b}</div>`).join("")}
+              </div>
+              <div class="sb-hint">Paste or drop an image to draw on it · Ctrl+Enter to send · Esc to close</div>
               <div style="display:flex;gap:8px">
                 <button class="sb-btn sb-btn-secondary" data-act="copy">Copy</button>
                 <button class="sb-btn sb-btn-primary" data-act="send">Send</button>
@@ -205,16 +214,26 @@ module.exports = class Scratchboard {
         document.activeElement?.blur?.();
         document.body.appendChild(o);
         window.addEventListener("keydown", this.onKey, true);
+        window.addEventListener("paste", this.onPaste, true);
+        for (const ev of ["dragenter", "dragover", "drop"]) window.addEventListener(ev, this.onDrag, true);
         this.refreshUI();
     }
 
     close() {
         if (!this.overlay) return;
         window.removeEventListener("keydown", this.onKey, true);
+        window.removeEventListener("paste", this.onPaste, true);
+        for (const ev of ["dragenter", "dragover", "drop"]) window.removeEventListener(ev, this.onDrag, true);
         this.stroke = null;
         this.canvas.remove();
         this.overlay.remove();
         this.overlay = null;
+        this.saveDrawing();
+    }
+
+    saveDrawing() {
+        if (this.isBlank()) BdApi.Data.delete("Scratchboard", "drawing");
+        else BdApi.Data.save("Scratchboard", "drawing", this.canvas.toDataURL("image/png"));
     }
 
     refreshUI() {
@@ -275,6 +294,41 @@ module.exports = class Scratchboard {
         else if (!mod && k === "]") this.setSize(this.prefs.size + (this.prefs.size >= 10 ? 4 : 1));
         else return;
         e.preventDefault();
+    }
+
+    onPaste(e) {
+        if (!this.overlay) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+        if (item) this.placeImage(item.getAsFile());
+    }
+
+    // Capture drags at the window so Discord's own "drop to upload" overlay doesn't open behind the board.
+    onDrag(e) {
+        if (!this.overlay) return;
+        e.stopPropagation();
+        e.preventDefault();
+        if (e.type !== "drop") return;
+        const file = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith("image/"));
+        if (file) this.placeImage(file);
+    }
+
+    // Draws an image centered on the board, shrunk to fit if it's too big.
+    async placeImage(blob) {
+        let img;
+        try {
+            img = await createImageBitmap(blob);
+        } catch {
+            BdApi.UI.showToast("Couldn't read that image", { type: "error" });
+            return;
+        }
+        const scale = Math.min(1, W / img.width, H / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        this.snapshot();
+        this.ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+        img.close();
+        this.refreshUI();
     }
 
     setTool(tool) { this.prefs.tool = tool; this.savePrefs(); this.refreshUI(); }
@@ -591,6 +645,7 @@ module.exports = class Scratchboard {
         this.close();
         this.snapshot(); // so Ctrl+Z next time brings the last sketch back
         this.ctx.clearRect(0, 0, W, H);
+        this.saveDrawing();
         BdApi.UI.showToast("Sketch attached, press Enter to send", { type: "success" });
         setTimeout(() => this.chatBox()?.focus(), 50);
     }
