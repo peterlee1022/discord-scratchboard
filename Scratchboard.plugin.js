@@ -1,6 +1,9 @@
 /**
  * @name Scratchboard
- * @author thegamer
+ * @author peterlee1022
+ * @authorLink https://github.com/peterlee1022
+ * @source https://github.com/peterlee1022/discord-scratchboard
+ * @website https://github.com/peterlee1022/discord-scratchboard
  * @description Adds a pencil button to the chat bar that opens a little sketchpad. Draw something and send it to the current channel as an image.
  * @version 1.0.0
  */
@@ -190,6 +193,8 @@ module.exports = class Scratchboard {
         this.canvas.onpointerleave = () => { this.cursor.style.display = "none"; };
         this.canvas.onpointerenter = () => { if (this.prefs.tool !== "fill") this.cursor.style.display = "block"; };
 
+        // Take focus off Discord's chat box so keys and pastes don't end up in it.
+        document.activeElement?.blur?.();
         document.body.appendChild(o);
         window.addEventListener("keydown", this.onKey, true);
         this.refreshUI();
@@ -489,8 +494,7 @@ module.exports = class Scratchboard {
         }
 
         // 2) Pretend the image was pasted into the chat box.
-        const area = (this.targetArea?.isConnected && this.targetArea) || document.querySelector('[class*="channelTextArea"]');
-        const box = area?.querySelector('[role="textbox"]');
+        const box = this.chatBox();
         if (box) {
             const dt = new DataTransfer();
             dt.items.add(file);
@@ -510,8 +514,12 @@ module.exports = class Scratchboard {
         this.snapshot(); // so Ctrl+Z next time brings the last sketch back
         this.ctx.clearRect(0, 0, W, H);
         BdApi.UI.showToast("Sketch attached, press Enter to send", { type: "success" });
-        setTimeout(() => {
-            document.querySelector('[class*="channelTextArea"] [role="textbox"]')?.focus();
-        }, 50);
+        setTimeout(() => this.chatBox()?.focus(), 50);
+    }
+
+    // The chat box the board was opened from, or the main one if Discord re-rendered it since.
+    chatBox() {
+        const area = (this.targetArea?.isConnected && this.targetArea) || document.querySelector('[class*="channelTextArea"]');
+        return area?.querySelector('[role="textbox"]');
     }
 };
