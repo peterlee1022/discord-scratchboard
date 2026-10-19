@@ -14,12 +14,16 @@ const SWATCHES = [
     "#111111", "#ffffff", "#8a8f98", "#e5484d", "#f76b15", "#ffc53d",
     "#46a758", "#12a594", "#3e63dd", "#8e4ec6", "#e93d82", "#8b5a2b"
 ];
+const SHAPES = ["line", "rect", "ellipse"];
 const BACKGROUNDS = { paper: "#ffffff", dark: "#313338", clear: null };
 
 const ICON_PENCIL = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
 const ICON_ERASER = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L13 19"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>`;
 const ICON_FILL = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>`;
 const ICON_BRUSH = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+const ICON_LINE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 19 19 5"/></svg>`;
+const ICON_RECT = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="6" width="16" height="12" rx="1"/></svg>`;
+const ICON_ELLIPSE = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="8.5" ry="6.5"/></svg>`;
 const ICON_UNDO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
 const ICON_REDO = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>`;
 const ICON_TRASH = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
@@ -146,8 +150,11 @@ module.exports = class Scratchboard {
             </div>
             <div class="sb-bar">
               <div class="sb-group">
-                <button class="sb-tool" data-tool="pen" title="Brush (B)">${ICON_BRUSH}</button>
+                <button class="sb-tool" data-tool="pen" title="Brush (B), Alt+click to pick a color, right-drag to erase">${ICON_BRUSH}</button>
                 <button class="sb-tool" data-tool="eraser" title="Eraser (E)">${ICON_ERASER}</button>
+                <button class="sb-tool" data-tool="line" title="Line (L)">${ICON_LINE}</button>
+                <button class="sb-tool" data-tool="rect" title="Rectangle (R), hold Shift for a square">${ICON_RECT}</button>
+                <button class="sb-tool" data-tool="ellipse" title="Ellipse (O), hold Shift for a circle">${ICON_ELLIPSE}</button>
                 <button class="sb-tool" data-tool="fill" title="Fill (F)">${ICON_FILL}</button>
               </div>
               <div class="sb-group sb-swatches">
@@ -190,6 +197,7 @@ module.exports = class Scratchboard {
         this.canvas.onpointerdown = e => this.pointerDown(e);
         this.canvas.onpointermove = e => this.pointerMove(e);
         this.canvas.onpointerup = this.canvas.onpointercancel = e => this.pointerUp(e);
+        this.canvas.oncontextmenu = e => e.preventDefault();
         this.canvas.onpointerleave = () => { this.cursor.style.display = "none"; };
         this.canvas.onpointerenter = () => { if (this.prefs.tool !== "fill") this.cursor.style.display = "block"; };
 
@@ -260,6 +268,9 @@ module.exports = class Scratchboard {
         else if (!mod && k === "b") this.setTool("pen");
         else if (!mod && k === "e") this.setTool("eraser");
         else if (!mod && k === "f") this.setTool("fill");
+        else if (!mod && k === "l") this.setTool("line");
+        else if (!mod && k === "r") this.setTool("rect");
+        else if (!mod && k === "o") this.setTool("ellipse");
         else if (!mod && k === "[") this.setSize(this.prefs.size - (this.prefs.size > 10 ? 4 : 1));
         else if (!mod && k === "]") this.setSize(this.prefs.size + (this.prefs.size >= 10 ? 4 : 1));
         else return;
@@ -302,9 +313,16 @@ module.exports = class Scratchboard {
     }
 
     pointerDown(e) {
-        if (e.button !== 0 && e.pointerType === "mouse") return;
+        // Right mouse button and a pen's eraser end (button 5) erase no matter which tool is picked.
+        const erase = e.button === 2 || e.button === 5;
+        if (e.button !== 0 && !erase) return;
         const p = this.toCanvas(e);
-        if (this.prefs.tool === "fill") {
+        if (e.altKey && !erase) {
+            this.pickColor(Math.floor(p.x), Math.floor(p.y));
+            return;
+        }
+        const tool = erase ? "eraser" : this.prefs.tool;
+        if (tool === "fill") {
             this.snapshot();
             this.floodFill(Math.floor(p.x), Math.floor(p.y), this.prefs.color);
             this.refreshUI();
@@ -312,9 +330,10 @@ module.exports = class Scratchboard {
         }
         this.canvas.setPointerCapture(e.pointerId);
         this.snapshot();
-        this.stroke = { last: p, mid: p, pressure: this.pressureOf(e) };
+        // `before` is the canvas as it was when the stroke started, so previews can be redrawn from scratch.
+        this.stroke = { tool, start: p, last: p, mid: p, pressure: this.pressureOf(e), before: this.undoStack[this.undoStack.length - 1] };
         // A tap with no movement should still leave a dot.
-        this.drawSegment(p, p, p);
+        if (!SHAPES.includes(tool)) this.drawSegment(p, p, p);
         this.refreshUI();
     }
 
@@ -322,10 +341,19 @@ module.exports = class Scratchboard {
         this.updateCursorSize();
         this.moveCursor(e);
         if (!this.stroke) return;
+        const s = this.stroke;
+        // Shapes, and brush strokes with Shift held, are previews that get redrawn on every move.
+        if (SHAPES.includes(s.tool) || e.shiftKey || s.straight) {
+            if (!SHAPES.includes(s.tool)) s.straight = true;
+            s.last = this.toCanvas(e);
+            s.moved = true;
+            this.ctx.putImageData(s.before, 0, 0);
+            this.drawShape(s.straight ? "line" : s.tool, s.start, s.last, e.shiftKey);
+            return;
+        }
         const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
         for (const ev of (events.length ? events : [e])) {
             const p = this.toCanvas(ev);
-            const s = this.stroke;
             const mid = { x: (s.last.x + p.x) / 2, y: (s.last.y + p.y) / 2 };
             s.pressure = this.pressureOf(ev);
             this.drawSegment(s.mid, s.last, mid);
@@ -337,7 +365,12 @@ module.exports = class Scratchboard {
     pointerUp(e) {
         if (!this.stroke) return;
         const s = this.stroke;
-        this.drawSegment(s.mid, s.last, s.last);
+        if (SHAPES.includes(s.tool) || s.straight) {
+            // A click without dragging draws nothing, so don't leave an empty undo step behind.
+            if (!s.moved) { this.undoStack.pop(); this.refreshUI(); }
+        } else {
+            this.drawSegment(s.mid, s.last, s.last);
+        }
         this.stroke = null;
     }
 
@@ -346,20 +379,65 @@ module.exports = class Scratchboard {
         return e.pointerType === "pen" && e.pressure > 0 ? 0.25 + e.pressure * 1.25 : 1;
     }
 
-    drawSegment(from, ctrl, to) {
+    // Sets up stroke style for the current tool, runs `path` to build the path, then strokes it.
+    strokePath(width, path) {
         const c = this.ctx;
-        const eraser = this.prefs.tool === "eraser";
+        const eraser = (this.stroke?.tool ?? this.prefs.tool) === "eraser";
         c.save();
         c.globalCompositeOperation = eraser ? "destination-out" : "source-over";
         c.strokeStyle = eraser ? "#000" : this.prefs.color;
-        c.lineWidth = this.prefs.size * (eraser ? 1.5 : this.stroke.pressure);
+        c.lineWidth = width * (eraser ? 1.5 : 1);
         c.lineCap = c.lineJoin = "round";
         c.beginPath();
-        c.moveTo(from.x, from.y);
-        c.quadraticCurveTo(ctrl.x, ctrl.y, to.x, to.y);
-        if (from.x === to.x && from.y === to.y) c.lineTo(to.x + 0.01, to.y);
+        path(c);
         c.stroke();
         c.restore();
+    }
+
+    drawSegment(from, ctrl, to, pressure = this.stroke.pressure) {
+        this.strokePath(this.prefs.size * pressure, c => {
+            c.moveTo(from.x, from.y);
+            c.quadraticCurveTo(ctrl.x, ctrl.y, to.x, to.y);
+            if (from.x === to.x && from.y === to.y) c.lineTo(to.x + 0.01, to.y);
+        });
+    }
+
+    // `constrain` (Shift) snaps lines to 45 degree steps and makes rectangles and ellipses square.
+    drawShape(shape, a, b, constrain) {
+        let dx = b.x - a.x, dy = b.y - a.y;
+        if (constrain && shape === "line") {
+            const step = Math.PI / 4;
+            const ang = Math.round(Math.atan2(dy, dx) / step) * step;
+            const len = Math.hypot(dx, dy);
+            dx = Math.cos(ang) * len;
+            dy = Math.sin(ang) * len;
+        } else if (constrain) {
+            const m = Math.max(Math.abs(dx), Math.abs(dy));
+            dx = Math.sign(dx || 1) * m;
+            dy = Math.sign(dy || 1) * m;
+        }
+        this.strokePath(this.prefs.size, c => {
+            if (shape === "line") {
+                c.moveTo(a.x, a.y);
+                c.lineTo(a.x + dx, a.y + dy);
+            } else if (shape === "rect") {
+                c.rect(a.x, a.y, dx, dy);
+            } else {
+                c.ellipse(a.x + dx / 2, a.y + dy / 2, Math.abs(dx / 2), Math.abs(dy / 2), 0, 0, Math.PI * 2);
+            }
+        });
+    }
+
+    // Picks the color under the cursor as it would look in the sent image, background included.
+    pickColor(x, y) {
+        const [r, g, b, a] = this.ctx.getImageData(x, y, 1, 1).data;
+        const bg = BACKGROUNDS[this.prefs.bg];
+        if (!a && !bg) return;
+        const n = bg ? parseInt(bg.slice(1), 16) : 0;
+        const under = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+        const k = bg ? a / 255 : 1;
+        const hex = [r, g, b].map((v, i) => Math.round(v * k + under[i] * (1 - k)).toString(16).padStart(2, "0")).join("");
+        this.setColor("#" + hex);
     }
 
     floodFill(x, y, hex) {
